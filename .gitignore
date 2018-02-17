@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # remove .DS_Store from the fucking planet
 .DS_Store
 
@@ -51,6 +52,8 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
+=======
+>>>>>>> 7665a769d5e668639ae00720f3dcaafd7231c986
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
