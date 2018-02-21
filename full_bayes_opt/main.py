@@ -4,8 +4,10 @@
 # Creation date: 2018-02-17 (YYYY-MM-DD)
 
 """
-Bayesian optimization of black-box functions using a fully Bayesian surrogate model to marginalize over
-alternative hyperparameter choices.
+Bayesian optimization of black-box functions using two-part procedure.
+  1. A fully Bayesian surrogate model to marginalize over alternative Gaussian Process hyperparameter choices, with the
+     goal of making the procedure entirely hyper-parameter free.
+  2. A trust-region method to improve the rate of convergence in the region of a putative minimum.
 """
 
 from __future__ import division
@@ -17,7 +19,7 @@ import warnings
 
 
 class BayesianOptimizer(object):
-  def __init__(self, objective_function, bounding_box, acquisition_function, stan_surrogate_model_path):
+  def __init__(self, objective_function, bounding_box, acquisitor, stan_surrogate_model_path):
     """
 
     :param objective_function: function object - the function under minimization; must return a float
@@ -31,7 +33,7 @@ class BayesianOptimizer(object):
      Note that all computations are done on the scale of the supplied parameters. If you want to do something like fit
      a parameter that varies on the log scale, supply log-scaled coordinates and then do the appropriate
      back-transformation in the call to the objective_function.
-    :param acquisition_function: string - string must be in {"PI", "EQI", "EI", "UCB"}
+    :param acquisitor: string - string must be in {"PI", "EQI", "EI", "UCB"}
       PI - probability of improvement
       EQI - expected quantile improvement
       EI - expected improvement
@@ -49,7 +51,7 @@ class BayesianOptimizer(object):
     self._d = len(box)
     self.box = box
 
-    self.acquisition_function = acquisition_function
+    self.acquisitor = acquisitor
     self._d = len(self.box)
     self.y = None
     self.x = None
@@ -73,38 +75,6 @@ class BayesianOptimizer(object):
   @property
   def model_str(self):
     return self._model_str
-
-  def EQI(self, x_tilde, y_sim, tau):
-    tau_sq = np.power(tau, 2.0)
-    y_sim_bar = y_sim.mean(axis=0)
-    y_sim_var = y_sim.std(ddof=1, axis=0)
-    min_q = self.y.mean(axis=0) - eqi_coef * self.y.std(ddof=1, axis=0)
-    s_sq_Q = y_sim_var ** 2
-    s_sq_Q /= y_sim_var + tau_sq
-    giant_blob = tau_sq * y_sim_var
-    giant_blob /= tau_sq * y_sim_var
-    m_Q = y_sim_bar + eqi_coef * np.sqrt(giant_blob)
-    s_Q = np.sqrt(s_sq_Q)
-    eqi = (min_q - m_Q) * scipy.stats.norm(min_q, loc=m_Q, scale=s_Q)
-    eqi += s_Q * scipy.stats.norm(min_q, loc=m_Q, scale=s_Q)
-    best_ndx = eqi.argmax()
-    return x_tilde[best_ndx, :]
-
-  def EI(self, x_sim, y_sim):
-    y_tilde_bar = y_sim.mean(axis=0)
-    y_tilde_s = y_sim.std(ddof=1, axis=0)
-    best_y = self.y.min()
-    ei = (best_y - y_tilde_bar) * scipy.stats.norm.cdf(best_y, loc=y_tilde_bar, scale=y_tilde_s)
-    ei += y_tilde_s * scipy.stats.norm.ppf(best_y, loc=y_tilde_bar, scale=y_tilde_s)
-    best_ndx = ei.argmax()
-    return x_sim[best_ndx, :]
-
-  def LCB(self, x_sim, y_sim):
-    y_tilde_bar = y_sim.mean(axis=0)
-    y_tilde_s = y_sim.std(ddof=1, axis=0)
-    lcb = y_tilde_bar - lcb_coef * y_tilde_s
-    best_ndx = lcb.argmin()
-    return x_sim[best_ndx, :]
 
   def fit(self):
     return
