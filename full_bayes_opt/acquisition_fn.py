@@ -75,10 +75,25 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
 
 
 class LowerConfidenceBound(AcquisitionFunction):
+  def __init__(self, delta, kernel_choice="rbf"):
+    raise NotImplementedError("¯\_(ツ)_/¯")
+    # validate inputs
+    # if not isinstance(delta, float):
+    #   raise ValueError("delta must be float")
+    # if not (0.0 < delta < 1.0):
+    #   raise ValueError("delta must be in (0.0, 1.0).")
+    # if kernel_choice not in ["rbf", "matern_2.5", "linear"]:
+    #   raise ValueError("argument kernel_choice not recognized. supplied value: %s" % kernel_choice)
+    # self._lcb_coef = lcb_coef
+
+  @property
+  def lcb_coef(self):
+    return self._lcb_coef
+
   def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
     y_sim, tau = self.unpack(stanfit_obj)
     y_sim_bar, y_sim_var = self.prep(y_sim)
 
-    lcb = y_sim_bar - lcb_coef * y_sim_var
+    lcb = y_sim_bar - self.lcb_coef * y_sim_var
     best_ndx = lcb.argmin()
     return x_sim[best_ndx, :]

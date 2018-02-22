@@ -6,6 +6,7 @@ functions {
     return sq_alpha * exp(-0.5 * dot_self((u - v) ./ rho));
   }
   matrix cov_exp_quad_ARD_self(vector[] x,
+                               vector y_var,
                                real alpha,
                                vector rho,
                                real delta){
@@ -14,7 +15,7 @@ functions {
 
     real sq_alpha = square(alpha);
     for (i in 1:(N - 1)) {
-      Sigma[i, i] = sq_alpha + delta;
+      Sigma[i, i] = y_var[i] + sq_alpha + delta;
       for (j in (i + 1):N) {
         Sigma[i, j] = ARD_kernel(x[i], x[j], sq_alpha, rho);
         Sigma[j, i] = Sigma[i, j];
@@ -57,14 +58,14 @@ functions {
       vector[M] g_mu;            // mean vector for predictions y_tilde
       matrix[M, M] g_cov;        // covariance matrix for y_tilde
       matrix[M, M] diag_delta;   // small amount of noise on the diagonal helps fitting
+      vector[M] y_tilde_var = rep_vector(0.0, M);     // known measurement error of y_tilde, i.e. 0.0.
 
       K = cov_exp_quad_ARD_other(x, x_tilde, alpha, rho);
 
       z = mdivide_left_tri_low(L_Sigma, y);
       X = mdivide_left_tri_low(L_Sigma, K);
       g_mu = X' * z;
-
-      g_cov = cov_exp_quad_ARD_self(x_tilde, alpha, rho, delta) - X' * X;
+      g_cov = cov_exp_quad_ARD_self(x_tilde, y_tilde_var, alpha, rho, delta) - X' * X;
 
       g = multi_normal_rng(g_mu, g_cov);
     }
@@ -82,7 +83,7 @@ data {
 transformed data {
   real delta = 1e-9;
   real y_bar = mean(y);
-  vector[N] y_shift = y - y_bar;
+  vector[N] y_var = rep_vector(0.0, N);
   // real alpha = 1.0;
 }
 parameters {
@@ -96,7 +97,7 @@ transformed parameters{
   matrix[N, N] L_Sigma;
 
   {
-    matrix[N, N] Sigma = cov_exp_quad_ARD_self(x, alpha, rho, delta);
+    matrix[N, N] Sigma = cov_exp_quad_ARD_self(x, y_var, alpha, rho, delta);
 
     L_Sigma = cholesky_decompose(Sigma);
     f = L_Sigma * eta;
@@ -107,7 +108,7 @@ model {
   alpha ~ normal(0, 1);
   sigma ~ normal(0, 0.1);
   eta ~ normal(0, 1);
-  y_shift ~ normal(f, sigma);
+  y ~ normal(f, sigma);
 }
 generated quantities {
   vector[M] g;
