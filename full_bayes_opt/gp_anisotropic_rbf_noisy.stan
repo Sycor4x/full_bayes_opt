@@ -85,11 +85,11 @@ transformed data {
   real delta = 1e-9;
   real y_bar = mean(y);
   vector[N] y_shift = y - y_bar;
-  // real alpha = 1.0;
 }
 parameters {
   vector<lower=0>[D] rho;
   real<lower=0> alpha;
+  real<lower=0> sigma;
   vector[N] eta;
 }
 transformed parameters{
@@ -116,5 +116,5 @@ generated quantities {
 
   g = gp_pred_rng(L_Sigma, x_tilde, y_shift, x, alpha, rho, delta);
   for (m in 1:M)
-    y_tilde[m] = normal_rng(g[m], delta) + y_bar;
+    y_tilde[m] = y_bar + normal_rng(g[m], sigma);
 }

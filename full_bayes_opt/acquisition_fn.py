@@ -15,10 +15,7 @@ import scipy.stats
 
 class AcquisitionFunction(object):
   def unpack(self, stanfit_obj):
-    param_dict = stanfit_obj.extract(["y_tilde", "sigma"])
-    y_tilde = param_dict["y_tilde"]
-    tau = param_dict["sigma"]
-    return y_tilde, tau
+    return stanfit_obj.extract(["y_tilde"])["y_tilde"]
 
   def prep(self, y):
     y_bar = y.mean(axis=0)
@@ -28,7 +25,7 @@ class AcquisitionFunction(object):
 
 class ExpectedImprovement(AcquisitionFunction):
   def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
-    y_sim, _ = self.unpack(stanfit_obj)
+    y_sim = self.unpack(stanfit_obj)
     y_sim_bar, y_sim_var = self.prep(y_sim)
 
     best_y = y.min()
@@ -42,9 +39,9 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
   def __init__(self, beta):
     # validate inputs
     if not isinstance(beta, float):
-      raise ValueError("argument beta must be float but supplied %s" % beta)
+      raise ValueError("argument `beta` must be float but supplied %s" % beta)
     if not (0.5 <= beta < 1.0):
-      raise ValueError("argument beta must be in [0.5, 1.0) but supplied %s." % beta)
+      raise ValueError("argument `beta` must be in [0.5, 1.0) but supplied %s." % beta)
     # fix this constant
     self._eqi_coef = scipy.stats.norm(beta)
 
@@ -52,7 +49,13 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
   def eqi_coef(self):
     return self._eqi_coef
 
-  def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
+  def unpack(self, stanfit_obj):
+    param_dict = stanfit_obj.extract(["y_tilde", "sigma"])
+    y_tilde = param_dict["y_tilde"]
+    tau = param_dict["sigma"]
+    return y_tilde, tau
+
+  def get_best_start(self, y, x_sim, stanfit_obj):
     y_sim, tau = self.unpack(stanfit_obj)
     tau_sq = np.power(tau, 2.0)
     y_sim_bar, y_sim_var = self.prep(y_sim)
@@ -91,7 +94,7 @@ class LowerConfidenceBound(AcquisitionFunction):
     return self._lcb_coef
 
   def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
-    y_sim, tau = self.unpack(stanfit_obj)
+    y_sim = self.unpack(stanfit_obj)
     y_sim_bar, y_sim_var = self.prep(y_sim)
 
     lcb = y_sim_bar - self.lcb_coef * y_sim_var

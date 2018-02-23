@@ -1,0 +1,17 @@
+g is a surrogate to f
+assume g is quadratic in the neighborhood of the minimum
+estimate the critical point of g by estimating A, b
+
+g(x) = (1/2) x' A x - b' x + c
+g'(x) = A x - b = 0
+A x = b
+
+so the critical point is A^{-1}b = 0
+
+how to estimate A, b
+
+----------
+
+suppose f(x) is a 
+E(f(x)) = 
+
