@@ -20,11 +20,11 @@ def stan_model_cache(stan_code, model_name=None, **kwargs):
   if model_name is None:
     cache_fname = "stan_model_%s.pkl" % code_hash
   else:
-    cache_fname = "stan_model_-%s-%s.pkl" % (model_name, code_hash)
+    cache_fname = "stan_model_%s_%s.pkl" % (model_name, code_hash)
   try:
     with open(cache_fname, "rb") as f:
       sm = pickle.load(f)
-  except FileNotFoundError:
+  except:
     sm = pystan.StanModel(model_code=stan_code)
     with open(cache_fname, "wb") as f:
       pickle.dump(sm, f)
@@ -50,12 +50,12 @@ if __name__ == "__main__":
   """
   # with same model_code as before
   data = dict(N=10, y=[0, 1, 0, 0, 0, 0, 0, 0, 0, 1])
-  sm = stan_model_cache(stan_code=model_code)
-  fit = sm.sampling(data=data)
+  sm_model = stan_model_cache(stan_code=model_code)
+  fit = sm_model.sampling(data=data)
   print(fit)
 
   new_data = dict(N=6, y=[0, 0, 0, 0, 0, 1])
   # the cached copy of the model will be used
-  sm = stan_model_cache(stan_code=model_code)
-  fit2 = sm.sampling(data=new_data)
+  sm_model = stan_model_cache(stan_code=model_code)
+  fit2 = sm_model.sampling(data=new_data)
   print(fit2)

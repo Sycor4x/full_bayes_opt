@@ -91,12 +91,12 @@ class BayesianOptimizer(object):
       raise ValueError("x has the wrong shape - x.shape[1] must equal len(bounding_box)=%d" % self.d)
     if self.y.size != len(self.x):
       raise ValueError("y must have len(x)=%d entries." % len(self.x))
-    self.y.reshape((len(self.x), 1))  # 2-dimensional array with 1 column
+    self.y.reshape((-1, 1))  # 2-dimensional array with 1 column
 
     with open(stan_surrogate_model_path) as f:
       self._stan_surrogate_model_code = f.read()
 
-    pretty_name = os.path.splitext("path_to_file")[0]
+    pretty_name = os.path.basename(os.path.splitext(stan_surrogate_model_path)[0])
     self._surrogate = stan_model_cache(stan_code=self.stan_surrogate_model_code, model_name=pretty_name)
 
     self.surrogate_model_control_default = {
@@ -133,7 +133,6 @@ class BayesianOptimizer(object):
   def explore(self, batch_size, surrogate_model_control):
     pars = ["y_tilde", "alpha", "rho", "sigma"]
     x_sim = self.sample_next(batch_size)
-    print(self.y.size)
     data = {
       "N": self.y.size,
       "M": batch_size,
@@ -145,9 +144,8 @@ class BayesianOptimizer(object):
     fit = self.surrogate.sampling(data=data, pars=pars, **surrogate_model_control)
     new_x = self.acquisitor(y=self.y, x_sim=x_sim, stanfit_obj=fit)
     new_y = self.obj_fn(new_x)
-    print(new_y.shape)
     self.x = np.vstack((self.x, new_x))
-    self.y = np.vstack((self.y, np.array([new_y])))
+    self.y = np.append(self.y, new_y)
 
   def fit(self, iter_opt=60, batch_size=100, surrogate_model_control=None):
     if not surrogate_model_control:
