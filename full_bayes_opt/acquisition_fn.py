@@ -55,7 +55,7 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
     tau = param_dict["sigma"]
     return y_tilde, tau
 
-  def get_best_start(self, y, x_sim, stanfit_obj):
+  def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
     y_sim, tau = self.unpack(stanfit_obj)
     tau_sq = np.power(tau, 2.0)
     y_sim_bar, y_sim_var = self.prep(y_sim)

@@ -16,11 +16,13 @@ import warnings
 
 import scipy.spatial as sp_spatial
 import numpy as np
-import pystan
+from .acquisition_fn import ExpectedImprovement, ExpectedQuantileImprovement
+from .stan_helpers import stan_model_cache
+import os
 
-models = {"rbf": "gp_anisotropic_rbf.stan",
-          "matern_2.5": None}
-
+# TODO - code to prevent unnecessary model re-compilation
+# TODO - include more optimization test functions
+# TODO -
 
 def prs_sample_size(q=0.05, p=0.95):
   """
@@ -36,12 +38,8 @@ def prs_sample_size(q=0.05, p=0.95):
   return np.log(1.0 - p) // np.log(q)
 
 
-# class QueryData(object):
-#   def __init__(self):
-#     pass
-#
-#   def append(self, key, value):
-#     pass
+# stan_model_list = {"gp_anisotropic_noiseless": "gp_anisotropic_noiseless.stan",
+#                    "gp_anisotropic_noisy": "gp_anisotropic_noisy.stan"}
 
 
 class BayesianOptimizer(object):
@@ -96,9 +94,10 @@ class BayesianOptimizer(object):
     self.y.reshape((len(self.x), 1))  # 2-dimensional array with 1 column
 
     with open(stan_surrogate_model_path) as f:
-      self._model_str = f.read()
+      self._stan_surrogate_model_code = f.read()
 
-    self._surrogate = pystan.StanModel(file=self.model_str)
+    pretty_name = os.path.splitext("path_to_file")[0]
+    self._surrogate = stan_model_cache(stan_code=self.stan_surrogate_model_code, model_name=pretty_name)
 
     self.surrogate_model_control_default = {
       "chains": 4,
@@ -124,8 +123,8 @@ class BayesianOptimizer(object):
     return self._obj_fn
 
   @property
-  def model_str(self):
-    return self._model_str
+  def stan_surrogate_model_code(self):
+    return self._stan_surrogate_model_code
 
   @property
   def surrogate(self):
@@ -134,6 +133,7 @@ class BayesianOptimizer(object):
   def explore(self, batch_size, surrogate_model_control):
     pars = ["y_tilde", "alpha", "rho", "sigma"]
     x_sim = self.sample_next(batch_size)
+    print(self.y.size)
     data = {
       "N": self.y.size,
       "M": batch_size,
@@ -143,25 +143,23 @@ class BayesianOptimizer(object):
       "x_tilde": x_sim,
     }
     fit = self.surrogate.sampling(data=data, pars=pars, **surrogate_model_control)
-    new_x = self.acquisitor(y=y, x_sim=x_sim, stanfit_obj=fit)
+    new_x = self.acquisitor(y=self.y, x_sim=x_sim, stanfit_obj=fit)
     new_y = self.obj_fn(new_x)
+    print(new_y.shape)
     self.x = np.vstack((self.x, new_x))
-    self.y = np.vstack((self.y, new_y))
-
-  def exploit(self):
-    pass
+    self.y = np.vstack((self.y, np.array([new_y])))
 
   def fit(self, iter_opt=60, batch_size=100, surrogate_model_control=None):
     if not surrogate_model_control:
       surrogate_model_control = self.surrogate_model_control_default
 
     for i in range(iter_opt):
-      if (i % 2) == 0:
-        self.explore(batch_size=batch_size, surrogate_model_control=surrogate_model_control)
-      else:
-        self.exploit()
+      self.explore(batch_size=batch_size, surrogate_model_control=surrogate_model_control)
+    return self.get_best(), self.y.min()
 
-    return
+  def get_best(self):
+    best_ndx = self.y.argmin()
+    return self.x[best_ndx, :]
 
   def sample_next(self, size=1):
     """
@@ -175,3 +173,17 @@ class BayesianOptimizer(object):
         new_x[i] = np.random.uniform(low=self.box[i, 0], high=self.box[i, 1], size=1)
       out = np.vstack((out, new_x))
     return np.matrix(out).reshape((size, self.d))
+
+
+class BayesianHybridOptimizer(BayesianOptimizer):
+  def exploit(self):
+    nearest_to_best = self.get_nearest_to_best()
+    interp_data = np.vstack((np.ones(len(nearest_to_best)), np.square(nearest_to_best)))
+
+    return
+
+  def get_nearest_to_best(self):
+    best_x = self.get_best()
+    x_dist_to_best = sp_spatial.distance.cdist(best_x, self.x)
+    nearest_to_best = np.argsort(x_dist_to_best)[:self.d + 2]
+    return self.x[nearest_to_best, :]
