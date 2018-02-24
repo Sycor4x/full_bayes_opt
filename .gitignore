@@ -1,3 +1,6 @@
+# pickled stan models
+stan_model_*.pkl
+
 # artifacts of research
 articles/
 

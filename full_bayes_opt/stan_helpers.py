@@ -24,7 +24,7 @@ def stan_model_cache(stan_code, model_name=None, **kwargs):
   try:
     with open(cache_fname, "rb") as f:
       sm = pickle.load(f)
-  except:
+  except FileNotFoundError:
     sm = pystan.StanModel(model_code=stan_code)
     with open(cache_fname, "wb") as f:
       pickle.dump(sm, f)

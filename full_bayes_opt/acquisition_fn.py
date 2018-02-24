@@ -20,17 +20,20 @@ class AcquisitionFunction(object):
   def prep(self, y):
     y_bar = y.mean(axis=0)
     y_sd = y.std(ddof=1.0, axis=0)
-    return y_bar, y_sd
+    y_sd_tilde = np.clip(y_sd, a_min=1e-9, a_max=np.inf)
+    return y_bar, y_sd_tilde
 
 
 class ExpectedImprovement(AcquisitionFunction):
+  # TODO - this is broken because the estimates are sometimes negative
   def __call__(self, y, x_sim, stanfit_obj, *args, **kwargs):
     y_sim = self.unpack(stanfit_obj)
-    y_sim_bar, y_sim_var = self.prep(y_sim)
+    y_sim_bar, y_sim_sd = self.prep(y_sim)
 
     best_y = y.min()
-    ei = (best_y - y_sim_bar) * scipy.stats.norm.cdf(best_y, loc=y_sim_bar, scale=y_sim_var)
-    ei += y_sim_var * scipy.stats.norm.ppf(best_y, loc=y_sim_bar, scale=y_sim_var)
+    ei = (best_y - y_sim_bar) * scipy.stats.norm.cdf(best_y, loc=y_sim_bar, scale=y_sim_sd)
+    ei += y_sim_sd * scipy.stats.norm.pdf(best_y, loc=y_sim_bar, scale=y_sim_sd)
+    print(ei.max())
     best_ndx = ei.argmax()
     return x_sim[best_ndx, :]
 
@@ -48,6 +51,11 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
   @property
   def eqi_coef(self):
     return self._eqi_coef
+
+  def prep(self, y):
+    y_bar = y.mean(axis=0)
+    y_var = y.var(ddof=1.0, axis=0)
+    return y_bar, y_var
 
   def unpack(self, stanfit_obj):
     param_dict = stanfit_obj.extract(["y_tilde", "sigma"])
@@ -70,8 +78,8 @@ class ExpectedQuantileImprovement(AcquisitionFunction):
 
     min_q = y.mean(axis=0) + self.eqi_coef * y.std(ddof=1, axis=0)
 
-    eqi = (min_q - m_Q) * scipy.stats.norm(min_q, loc=m_Q, scale=s_Q)
-    eqi += s_Q * scipy.stats.norm(min_q, loc=m_Q, scale=s_Q)
+    eqi = (min_q - m_Q) * scipy.stats.norm.cdf(min_q, loc=m_Q, scale=s_Q)
+    eqi += s_Q * scipy.stats.norm.pdf(min_q, loc=m_Q, scale=s_Q)
 
     best_ndx = eqi.argmax()
     return x_sim[best_ndx, :]

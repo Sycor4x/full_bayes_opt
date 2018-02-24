@@ -17,8 +17,10 @@ import warnings
 import scipy.spatial as sp_spatial
 import numpy as np
 from .acquisition_fn import ExpectedImprovement, ExpectedQuantileImprovement
+
 from .stan_helpers import stan_model_cache
 import os
+
 
 # TODO - code to prevent unnecessary model re-compilation
 # TODO - include more optimization test functions
@@ -36,10 +38,6 @@ def prs_sample_size(q=0.05, p=0.95):
   if not (0.0 < q < 1.0) or not (0.0 < p < 1.0):
     raise ValueError("Both p and q must be probabilities.")
   return np.log(1.0 - p) // np.log(q)
-
-
-# stan_model_list = {"gp_anisotropic_noiseless": "gp_anisotropic_noiseless.stan",
-#                    "gp_anisotropic_noisy": "gp_anisotropic_noisy.stan"}
 
 
 class BayesianOptimizer(object):
